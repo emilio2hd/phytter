@@ -19,6 +19,10 @@ import tweepy
 from dateutil.parser import parse
 from dateutil.tz import tzlocal
 
+import pytter
+from pytter.gui import AboutDialog
+from pytter.utilities import restart_program
+
 
 gtk.gdk.threads_init()
 
@@ -32,22 +36,6 @@ sh.setFormatter(formatter)
 logger = logging.getLogger("Pytter")
 logger.setLevel(logging.ERROR)
 logger.addHandler(sh)
-
-VERSION = "0.1"
-ABOUT_TXT = """A simple twitter watcher.
-
-by: Emilio S. Carmo
-<a href="mailto:emilio2hd@gmail.com">emilio2hd@gmail.com</a>
-<a href="http://github.com/emilio2hd/pytter">http://github.com/emilio2hd/pytter</a>
-"""
-
-def restart_program():
-    """Restarts the current program.
-    Note: this function does not return. Any cleanup action (like
-    saving data) must be done before calling this function."""
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
-
 
 class StreamWatcherListener(tweepy.StreamListener):
     status_wrapper = TextWrapper(width=60)
@@ -231,13 +219,7 @@ class Pytter():
 
     @staticmethod
     def about(widget, data=None):
-        md = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_CLOSE)
-        try:
-            md.set_markup("<b>Pytter %s</b>" % VERSION)
-            md.format_secondary_markup(ABOUT_TXT)
-            md.run()
-        finally:
-            md.destroy()
+        AboutDialog().destroy()
 
     def main(self):
         self.start()

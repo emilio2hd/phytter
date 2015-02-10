@@ -1,0 +1,6 @@
+__name__ = 'Pytter'
+__version__ = '0.1'
+__author__ = 'Emilio S. Carmo'
+__website__ = 'http://github.com/emilio2hd/pytter'
+__comment__ = 'A simple twitter watcher.'
+__license__ = 'MIT'
