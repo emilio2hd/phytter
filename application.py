@@ -7,35 +7,23 @@ import urllib
 import appindicator
 import pynotify
 import gtk
-import logging
 import sys
 from threading import Thread
 from textwrap import TextWrapper
 from xml.etree.ElementTree import ElementTree, SubElement
-from logging.handlers import SysLogHandler
 from xml.sax.saxutils import escape
 
 import tweepy
 from dateutil.parser import parse
 from dateutil.tz import tzlocal
 
-import pytter
 from pytter.gui import AboutDialog
 from pytter.utilities import restart_program
+from pytter import logger
 
 
 gtk.gdk.threads_init()
 
-LOG_FILENAME = '/var/log/pytter.log'
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-sh = SysLogHandler(address='/dev/log')
-sh.setLevel(logging.DEBUG)
-sh.setFormatter(formatter)
-
-logger = logging.getLogger("Pytter")
-logger.setLevel(logging.ERROR)
-logger.addHandler(sh)
 
 class StreamWatcherListener(tweepy.StreamListener):
     status_wrapper = TextWrapper(width=60)
@@ -46,20 +34,14 @@ class StreamWatcherListener(tweepy.StreamListener):
 
     def on_status(self, status):
         try:
-            # print self.status_wrapper.fill(status.text)
             self.pytter.show_tweet(status)
-
-            # print '\n %s  %s  via %s\n' % (status.author.screen_name, status.created_at, status.source)
         except:
             # Catch any unicode errors while printing to console
             # and just ignore them to avoid breaking application.
             pass
 
     def on_error(self, status_code):
-        print(status_code)
-
-    def on_timeout(self):
-        print 'Snoozing Zzzzzz'
+        logger.error(status_code)
 
 
 class StreamWatcherStarter(Thread):
@@ -73,7 +55,7 @@ class StreamWatcherStarter(Thread):
         stream.userstream()
 
 
-class Pytter():
+class Application():
     def __init__(self):
         self.stream = None
         self.root_dir = os.path.dirname(os.path.realpath(__file__))
@@ -137,21 +119,20 @@ class Pytter():
     def gtk_prompt(name):
         prompt = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK_CANCEL, name)
         prompt.set_title("Prompt")
-        # Create and add entry box to dialog
+
         entry = gtk.Entry()
         prompt.vbox.add(entry)
-        # Show all widgets in prompt
+
         prompt.show_all()
-        # Run dialog until user clicks OK or Cancel
+
         if prompt.run() == gtk.RESPONSE_CANCEL:
-            # User cancelled dialog
             rval = False
         else:
-            # User clicked OK, grab text from entry box
+
             rval = entry.get_text()
-        # Destory prompt
+
         prompt.destroy()
-        # Give the good (or bad) news
+
         return rval
 
     def authenticate(self):
@@ -172,9 +153,8 @@ class Pytter():
 
         try:
             auth.get_access_token(verifier)
-            access_token = auth.get_access_token(verifier)
         except tweepy.TweepError:
-            print "Error! Failed to get access token."
+            logger.error("Error! Failed to get access token.")
 
         api = tweepy.API(auth)
         if api.verify_credentials():
@@ -186,12 +166,12 @@ class Pytter():
             self.settings.write("settings.xml")
             restart_program()
         else:
-            print "Error! OAuth credentials are incorrect."
+            logger.error("Error! OAuth credentials are incorrect.")
         return False
 
     @staticmethod
     def show_tweet(tweet):
-        # print tweet.author.created_at
+
         autor = "%s (@%s)" % (tweet.author.name, tweet.author.screen_name)
         timedate_str = parse(str(tweet.created_at) + " +0000").astimezone(tzlocal()).strftime("%x (%X)")
 
@@ -199,13 +179,13 @@ class Pytter():
         urlregex = re.compile("(http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+)",
                               re.IGNORECASE)
 
-        texto = escape(tweet.text)
-        texto = urlregex.sub(r'<a href="\1">\1</a>', texto)
-        texto = re.sub(r'(\A|\s)@(\w+)', r'\1<a href="http://www.twitter.com/\2">@\2</a>', texto)
-        texto = re.sub(r'(\A|\s)#(\w+)', r'\1<a href="C:HT#\2">#\2</a>', texto)
-        texto += '''\n<small>%s</small>''' % timedate_str
+        text = escape(tweet.text)
+        text = urlregex.sub(r'<a href="\1">\1</a>', text)
+        text = re.sub(r'(\A|\s)@(\w+)', r'\1<a href="http://www.twitter.com/\2">@\2</a>', text)
+        text = re.sub(r'(\A|\s)#(\w+)', r'\1<a href="C:HT#\2">#\2</a>', text)
+        text += '''\n<small>%s</small>''' % timedate_str
 
-        n = pynotify.Notification(autor, texto)
+        n = pynotify.Notification(autor, text)
 
         response = urllib.urlopen(tweet.author.profile_image_url)
         input_stream = gio.memory_input_stream_new_from_data(response.read())
@@ -228,7 +208,6 @@ class Pytter():
 
 if __name__ == '__main__':
     try:
-        pytter = Pytter()
-        pytter.main()
+        Application().main()
     except KeyboardInterrupt:
         print '\nGoodbye!'
