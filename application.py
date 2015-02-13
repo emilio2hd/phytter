@@ -10,7 +10,6 @@ import gtk
 import sys
 from threading import Thread
 from textwrap import TextWrapper
-from xml.etree.ElementTree import ElementTree, SubElement
 from xml.sax.saxutils import escape
 
 import tweepy
@@ -18,7 +17,7 @@ from dateutil.parser import parse
 from dateutil.tz import tzlocal
 
 from pytter.gui import AboutDialog
-from pytter.utilities import restart_program
+from pytter.utilities import restart_program, Settings
 from pytter import logger
 
 
@@ -87,11 +86,8 @@ class Application():
 
         self.ind.set_menu(self.menu)
 
-        self.settings = ElementTree()
-
         try:
-            self.settings = ElementTree()
-            self.settings.parse("settings.xml")
+            self.settings = Settings()
         except:
             logger.error("Fail to parse settings file.")
             sys.exit(1)
@@ -99,17 +95,12 @@ class Application():
     def start(self):
         pynotify.init('phytter')
 
-        if self.settings.find("oauth/accessToken") is None:
+        if not self.settings.has_token():
             gtk.idle_add(self.authenticate)
             return
 
-        consumer_token = self.settings.find("oauth/consumerKey")
-        consumer_secret = self.settings.find("oauth/consumerSecret")
-        auth = tweepy.OAuthHandler(consumer_token.text, consumer_secret.text)
-
-        access_token = self.settings.find("oauth/accessToken")
-        access_token_secret = self.settings.find("oauth/accessTokenSecret")
-        auth.set_access_token(access_token.text, access_token_secret.text)
+        auth = tweepy.OAuthHandler(self.settings.consumer_key(), self.settings.consumer_secret())
+        auth.set_access_token(self.settings.access_token(), self.settings.access_token_secret())
 
         self.stream = StreamWatcherStarter(auth, self)
         self.stream.daemon = True
@@ -138,9 +129,7 @@ class Application():
     def authenticate(self):
         import webbrowser
 
-        consumer_token = self.settings.find("oauth/consumerKey")
-        consumer_secret = self.settings.find("oauth/consumerSecret")
-        auth = tweepy.OAuthHandler(consumer_token.text, consumer_secret.text)
+        auth = tweepy.OAuthHandler(self.settings.consumer_key(), self.settings.consumer_secret())
 
         redirect = ""
         try:
@@ -158,12 +147,7 @@ class Application():
 
         api = tweepy.API(auth)
         if api.verify_credentials():
-            xml_oauth = self.settings.find("oauth")
-            xml_access_token = SubElement(xml_oauth, "accessToken")
-            xml_access_token.text = auth.access_token
-            xml_access_token_secret = SubElement(xml_oauth, "accessTokenSecret")
-            xml_access_token_secret.text = auth.access_token_secret
-            self.settings.write("settings.xml")
+            self.settings.write_access(auth.access_token, auth.access_token_secret)
             restart_program()
         else:
             logger.error("Error! OAuth credentials are incorrect.")
