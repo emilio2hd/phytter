@@ -3,6 +3,20 @@ import gtk
 import pytter
 
 
+def append_menu_about(menu, on_click_exit):
+    image = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
+    image.connect("activate", on_click_exit)
+    image.show()
+    menu.append(image)
+
+
+def append_menu_quit(menu, on_click_exit):
+    image = gtk.ImageMenuItem(gtk.STOCK_QUIT)
+    image.connect("activate", on_click_exit)
+    image.show()
+    menu.append(image)
+
+
 class AboutDialog(gtk.AboutDialog):
     def __init__(self, *args, **kwargs):
         super(AboutDialog, self).__init__(*args, **kwargs)

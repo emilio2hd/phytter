@@ -2,56 +2,20 @@
 
 import gio
 import os
-import re
 import urllib
 import appindicator
 import pynotify
 import gtk
 import sys
-from threading import Thread
-from textwrap import TextWrapper
-from xml.sax.saxutils import escape
-from dateutil.parser import parse
-from dateutil.tz import tzlocal
 
 import tweepy
 
-from pytter.gui import AboutDialog, PinDialog
-from pytter.utilities import restart_program, Settings
+from pytter.gui import AboutDialog, PinDialog, append_menu_about, append_menu_quit
+from pytter.utilities import restart_program, Settings, PytterUserStream
 from pytter import logger
 
 
 gtk.gdk.threads_init()
-
-
-class StreamWatcherListener(tweepy.StreamListener):
-    status_wrapper = TextWrapper(width=60)
-
-    def __init__(self, window):
-        super(StreamWatcherListener, self).__init__()
-        self.pytter = window
-
-    def on_status(self, status):
-        try:
-            self.pytter.show_tweet(status)
-        except:
-            # Catch any unicode errors while printing to console
-            # and just ignore them to avoid breaking application.
-            pass
-
-    def on_error(self, status_code):
-        logger.error(status_code)
-
-
-class StreamWatcherStarter(Thread):
-    def __init__(self, auth, window):
-        Thread.__init__(self)
-        self.auth = auth
-        self.window = window
-
-    def run(self):
-        stream = tweepy.Stream(auth=self.auth, listener=StreamWatcherListener(self.window))
-        stream.userstream()
 
 
 class Application():
@@ -63,28 +27,21 @@ class Application():
         if not os.path.isfile(icon_image):
             icon_image = "indicator-messages"
 
-        self.ind = appindicator.Indicator("example-simple-client", icon_image, appindicator.CATEGORY_APPLICATION_STATUS)
-        self.ind.set_status(appindicator.STATUS_ACTIVE)
+        self.indicator = appindicator.Indicator("pytter", icon_image, appindicator.CATEGORY_APPLICATION_STATUS)
+        self.indicator.set_status(appindicator.STATUS_ACTIVE)
 
         self.menu = gtk.Menu()
 
-        image = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
-        image.connect("activate", self.show_about)
-        image.show()
-        self.menu.append(image)
+        append_menu_about(self.menu, self.on_click_about)
 
         separator = gtk.SeparatorMenuItem()
         separator.show()
         self.menu.append(separator)
 
-        image = gtk.ImageMenuItem(gtk.STOCK_QUIT)
-        image.connect("activate", self.exit)
-        image.show()
-        self.menu.append(image)
+        append_menu_quit(self.menu, self.on_click_quit)
 
         self.menu.show()
-
-        self.ind.set_menu(self.menu)
+        self.indicator.set_menu(self.menu)
 
         try:
             self.settings = Settings()
@@ -102,17 +59,9 @@ class Application():
         auth = tweepy.OAuthHandler(self.settings.consumer_key(), self.settings.consumer_secret())
         auth.set_access_token(self.settings.access_token(), self.settings.access_token_secret())
 
-        self.stream = StreamWatcherStarter(auth, self)
+        self.stream = PytterUserStream(auth, self)
         self.stream.daemon = True
         self.stream.start()
-
-    @staticmethod
-    def gtk_prompt(name):
-        prompt = PinDialog()
-        pin = prompt.get_pin()
-        prompt.destroy()
-
-        return pin
 
     def authenticate(self):
         import webbrowser
@@ -126,12 +75,13 @@ class Application():
             logger.error("Failed to get request token.")
 
         webbrowser.open(redirect, 2, True)
-        verifier = self.gtk_prompt("Enter PIN: ")
+        pin = self.get_pin_from_prompt()
 
         try:
-            auth.get_access_token(verifier)
+            auth.get_access_token(pin)
         except tweepy.TweepError:
             logger.error("Error! Failed to get access token.")
+            sys.exit(1)
 
         api = tweepy.API(auth)
         if api.verify_credentials():
@@ -139,39 +89,35 @@ class Application():
             restart_program()
         else:
             logger.error("Error! OAuth credentials are incorrect.")
+
         return False
 
     @staticmethod
-    def show_tweet(tweet):
+    def show_tweet(text, author, author_profile_image_url):
+        notification = pynotify.Notification(author, text)
 
-        autor = "%s (@%s)" % (tweet.author.name, tweet.author.screen_name)
-        timedate_str = parse(str(tweet.created_at) + " +0000").astimezone(tzlocal()).strftime("%x (%X)")
-
-        # Use regexes to link URLs, hashtags, and usernames
-        urlregex = re.compile("(http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+)",
-                              re.IGNORECASE)
-
-        text = escape(tweet.text)
-        text = urlregex.sub(r'<a href="\1">\1</a>', text)
-        text = re.sub(r'(\A|\s)@(\w+)', r'\1<a href="http://www.twitter.com/\2">@\2</a>', text)
-        text = re.sub(r'(\A|\s)#(\w+)', r'\1<a href="C:HT#\2">#\2</a>', text)
-        text += '''\n<small>%s</small>''' % timedate_str
-
-        n = pynotify.Notification(autor, text)
-
-        response = urllib.urlopen(tweet.author.profile_image_url)
+        response = urllib.urlopen(author_profile_image_url)
         input_stream = gio.memory_input_stream_new_from_data(response.read())
         pixbuf = gtk.gdk.pixbuf_new_from_stream(input_stream)
-        n.set_icon_from_pixbuf(pixbuf)
-        n.show()
+
+        notification.set_icon_from_pixbuf(pixbuf)
+        notification.show()
 
     @staticmethod
-    def exit(widget, data=None):
+    def on_click_quit(widget, data=None):
         gtk.main_quit()
 
     @staticmethod
-    def show_about(widget, data=None):
+    def on_click_about(widget, data=None):
         AboutDialog().destroy()
+
+    @staticmethod
+    def get_pin_from_prompt():
+        prompt = PinDialog()
+        pin = prompt.get_pin()
+        prompt.destroy()
+
+        return pin
 
     def main(self):
         self.start()
