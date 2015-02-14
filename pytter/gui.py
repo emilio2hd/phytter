@@ -14,3 +14,21 @@ class AboutDialog(gtk.AboutDialog):
         self.set_website(pytter.__website__)
         self.set_logo(gtk.gdk.pixbuf_new_from_file("ico.png"))
         self.run()
+
+
+class PinDialog(gtk.MessageDialog):
+    def __init__(self):
+        super(PinDialog, self).__init__(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK_CANCEL, "Enter PIN: ")
+
+        self.set_title("Prompt")
+        entry = gtk.Entry()
+        self.vbox.add(entry)
+        self.show_all()
+
+        if self.run() == gtk.RESPONSE_CANCEL:
+            self.pin = False
+        else:
+            self.pin = entry.get_text()
+
+    def get_pin(self):
+        return self.pin

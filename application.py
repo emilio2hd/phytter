@@ -11,12 +11,12 @@ import sys
 from threading import Thread
 from textwrap import TextWrapper
 from xml.sax.saxutils import escape
-
-import tweepy
 from dateutil.parser import parse
 from dateutil.tz import tzlocal
 
-from pytter.gui import AboutDialog
+import tweepy
+
+from pytter.gui import AboutDialog, PinDialog
 from pytter.utilities import restart_program, Settings
 from pytter import logger
 
@@ -69,7 +69,7 @@ class Application():
         self.menu = gtk.Menu()
 
         image = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
-        image.connect("activate", self.about)
+        image.connect("activate", self.show_about)
         image.show()
         self.menu.append(image)
 
@@ -78,7 +78,7 @@ class Application():
         self.menu.append(separator)
 
         image = gtk.ImageMenuItem(gtk.STOCK_QUIT)
-        image.connect("activate", self.sair)
+        image.connect("activate", self.exit)
         image.show()
         self.menu.append(image)
 
@@ -108,23 +108,11 @@ class Application():
 
     @staticmethod
     def gtk_prompt(name):
-        prompt = gtk.MessageDialog(None, 0, gtk.MESSAGE_INFO, gtk.BUTTONS_OK_CANCEL, name)
-        prompt.set_title("Prompt")
-
-        entry = gtk.Entry()
-        prompt.vbox.add(entry)
-
-        prompt.show_all()
-
-        if prompt.run() == gtk.RESPONSE_CANCEL:
-            rval = False
-        else:
-
-            rval = entry.get_text()
-
+        prompt = PinDialog()
+        pin = prompt.get_pin()
         prompt.destroy()
 
-        return rval
+        return pin
 
     def authenticate(self):
         import webbrowser
@@ -178,11 +166,11 @@ class Application():
         n.show()
 
     @staticmethod
-    def sair(widget, data=None):
+    def exit(widget, data=None):
         gtk.main_quit()
 
     @staticmethod
-    def about(widget, data=None):
+    def show_about(widget, data=None):
         AboutDialog().destroy()
 
     def main(self):
