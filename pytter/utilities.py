@@ -45,7 +45,7 @@ class PytterUserStreamListener(tweepy.StreamListener):
 
             self.application.show_tweet(text, author, tweet.author.profile_image_url)
         except:
-            print("Unicode erro.")
+            print("Unicode error.")
             # Catch any unicode errors while printing to console
             # and just ignore them to avoid breaking application.
             pass
