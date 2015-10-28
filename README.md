@@ -1,5 +1,5 @@
 # Pytter
-Watcher for new tweets, built in Python 2.7.6
+Watcher for new tweets, built in Python 2.7.6  
 Tested on Xubuntu 14.04
 
 # Requirements
